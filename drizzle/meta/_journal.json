@@ -15,6 +15,13 @@
       "when": 1795265585237,
       "tag": "0001_create_users",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795267660078,
+      "tag": "0002_lessons_progress",
+      "breakpoints": true
     }
   ]
 }

@@ -3,3 +3,4 @@
 export * from "./_shared.ts";
 export * from "./tasks.ts";
 export * from "./users.ts";
+export * from "./progress.ts";
