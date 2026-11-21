@@ -72,11 +72,11 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
       const courses: Record<string, { progressPercent: number; status: z.infer<typeof NodeStatus> }> = {};
       for (const c of listCourses()) {
         const n = c.lessons.filter((l) => done.has(l.id)).length;
-        const progressPercent = Math.round((n / c.lessons.length) * 100);
+        const progressPercent = c.lessons.length ? Math.round((n / c.lessons.length) * 100) : 0;
         const touched = n > 0 || c.lessons.some((l) => started.has(l.id));
         courses[c.id] = {
           progressPercent,
-          status: n === c.lessons.length ? "completed" : touched ? "in_progress" : "available",
+          status: c.lessons.length > 0 && n === c.lessons.length ? "completed" : touched ? "in_progress" : "available",
         };
       }
       return { completedLessonIds: [...done], startedLessonIds: [...started], courses };
@@ -108,10 +108,9 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
 
       // Already solved: return the stored result, no new attempt.
       const solved = previous.find((a) => a.verdict === "correct");
-      if (solved) {
-        const checked = checkAnswer(found.exercise, solved.answer as AnswerBody)!;
-        return toResult(exerciseId, solved, checked);
-      }
+      // If the content changed since then and the stored answer no longer fits, check the new one instead.
+      const solvedCheck = solved && checkAnswer(found.exercise, solved.answer as AnswerBody);
+      if (solved && solvedCheck) return toResult(exerciseId, solved, solvedCheck);
 
       const checked = checkAnswer(found.exercise, req.body);
       if (!checked) return reply.code(400).send(error("Answer does not match this exercise type"));
