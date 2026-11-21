@@ -1,51 +1,68 @@
 import { desc, eq } from "drizzle-orm";
-import { Router } from "express";
+import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { db } from "../db/index.ts";
 import { tasks } from "../db/schema.ts";
 
-// Example resource: copy this file for new resources, then delete it.
-export const tasksRouter = Router();
+// Example resource: copy this file for new resources, register it in src/app.ts, then delete it.
 
-const createSchema = z.object({ title: z.string().trim().min(1).max(500) });
-const updateSchema = z.object({
-  title: z.string().trim().min(1).max(500).optional(),
-  done: z.boolean().optional(),
-});
-const idSchema = z.uuid();
+const Task = z.object({ id: z.uuid(), title: z.string(), done: z.boolean(), createdAt: z.date() });
+const Params = z.object({ id: z.uuid() });
+const NotFound = z.object({ error: z.string() });
+const notFound = { error: "Task not found" };
 
-tasksRouter.get("/", async (_req, res) => {
-  res.json(await db.select().from(tasks).orderBy(desc(tasks.createdAt)));
-});
+export const tasksRoutes: FastifyPluginAsyncZod = async (app) => {
+  app.get("/", { schema: { tags: ["tasks"], response: { 200: z.array(Task) } } }, async () => {
+    return db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  });
 
-tasksRouter.get("/:id", async (req, res) => {
-  const id = idSchema.safeParse(req.params.id);
-  if (!id.success) return void res.status(404).json({ error: "Task not found" });
-  const [task] = await db.select().from(tasks).where(eq(tasks.id, id.data));
-  if (!task) return void res.status(404).json({ error: "Task not found" });
-  res.json(task);
-});
+  app.get(
+    "/:id",
+    { schema: { tags: ["tasks"], params: Params, response: { 200: Task, 404: NotFound } } },
+    async (req, reply) => {
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, req.params.id));
+      return task ?? reply.code(404).send(notFound);
+    },
+  );
 
-tasksRouter.post("/", async (req, res) => {
-  const body = createSchema.parse(req.body);
-  const [task] = await db.insert(tasks).values(body).returning();
-  res.status(201).json(task);
-});
+  app.post(
+    "/",
+    {
+      schema: {
+        tags: ["tasks"],
+        body: z.object({ title: z.string().trim().min(1).max(500) }),
+        response: { 201: Task },
+      },
+    },
+    async (req, reply) => {
+      const [task] = await db.insert(tasks).values(req.body).returning();
+      return reply.code(201).send(task);
+    },
+  );
 
-tasksRouter.patch("/:id", async (req, res) => {
-  const id = idSchema.safeParse(req.params.id);
-  if (!id.success) return void res.status(404).json({ error: "Task not found" });
-  const body = updateSchema.parse(req.body);
-  const [task] = await db.update(tasks).set(body).where(eq(tasks.id, id.data)).returning();
-  if (!task) return void res.status(404).json({ error: "Task not found" });
-  res.json(task);
-});
+  app.patch(
+    "/:id",
+    {
+      schema: {
+        tags: ["tasks"],
+        params: Params,
+        body: z.object({ title: z.string().trim().min(1).max(500).optional(), done: z.boolean().optional() }),
+        response: { 200: Task, 404: NotFound },
+      },
+    },
+    async (req, reply) => {
+      const [task] = await db.update(tasks).set(req.body).where(eq(tasks.id, req.params.id)).returning();
+      return task ?? reply.code(404).send(notFound);
+    },
+  );
 
-tasksRouter.delete("/:id", async (req, res) => {
-  const id = idSchema.safeParse(req.params.id);
-  if (!id.success) return void res.status(404).json({ error: "Task not found" });
-  const [task] = await db.delete(tasks).where(eq(tasks.id, id.data)).returning();
-  if (!task) return void res.status(404).json({ error: "Task not found" });
-  res.status(204).end();
-});
+  app.delete(
+    "/:id",
+    { schema: { tags: ["tasks"], params: Params, response: { 204: z.null(), 404: NotFound } } },
+    async (req, reply) => {
+      const [task] = await db.delete(tasks).where(eq(tasks.id, req.params.id)).returning();
+      return task ? reply.code(204).send(null) : reply.code(404).send(notFound);
+    },
+  );
+};
