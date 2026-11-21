@@ -15,6 +15,8 @@ import { db } from "./db/index.ts";
 import { env } from "./env.ts";
 import { registerAuth } from "./plugins/auth.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { coursesRoutes } from "./routes/courses.ts";
+import { progressRoutes } from "./routes/progress.ts";
 import { tasksRoutes } from "./routes/tasks.ts";
 
 const PUBLIC_PATHS = ["/health", "/docs"];
@@ -78,6 +80,8 @@ export async function buildApp() {
 
   // Feature routes. Each plugin declares its full paths (grep a path to find its owner).
   await app.register(authRoutes);
+  await app.register(coursesRoutes);
+  await app.register(progressRoutes);
 
   // Example resource, kept for the frontend /examples/tasks page. Remove both together.
   await app.register(tasksRoutes, { prefix: "/tasks" });
