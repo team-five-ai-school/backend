@@ -52,21 +52,34 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
         response: {
           200: z.object({
             completedLessonIds: z.array(z.string()),
+            /** Lessons with at least one answer that are not completed yet. */
+            startedLessonIds: z.array(z.string()),
             courses: z.record(z.string(), z.object({ progressPercent: z.number(), status: NodeStatus })),
           }),
         },
       },
     },
     async (req) => {
-      const rows = await db.select().from(lessonCompletions).where(eq(lessonCompletions.userId, req.user.sub));
+      const [rows, attempted] = await Promise.all([
+        db.select().from(lessonCompletions).where(eq(lessonCompletions.userId, req.user.sub)),
+        db
+          .selectDistinct({ lessonId: exerciseAttempts.lessonId })
+          .from(exerciseAttempts)
+          .where(eq(exerciseAttempts.userId, req.user.sub)),
+      ]);
       const done = new Set(rows.map((r) => r.lessonId));
+      const started = new Set(attempted.map((r) => r.lessonId).filter((id) => !done.has(id)));
       const courses: Record<string, { progressPercent: number; status: z.infer<typeof NodeStatus> }> = {};
       for (const c of listCourses()) {
         const n = c.lessons.filter((l) => done.has(l.id)).length;
         const progressPercent = Math.round((n / c.lessons.length) * 100);
-        courses[c.id] = { progressPercent, status: n === 0 ? "available" : n === c.lessons.length ? "completed" : "in_progress" };
+        const touched = n > 0 || c.lessons.some((l) => started.has(l.id));
+        courses[c.id] = {
+          progressPercent,
+          status: n === c.lessons.length ? "completed" : touched ? "in_progress" : "available",
+        };
       }
-      return { completedLessonIds: [...done], courses };
+      return { completedLessonIds: [...done], startedLessonIds: [...started], courses };
     },
   );
 
