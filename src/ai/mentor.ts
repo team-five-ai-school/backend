@@ -55,12 +55,17 @@ export function leaksAnswer(reply: MentorReply, lesson: SourceLesson, revealed: 
   return hidden.some((h) => text.includes(h));
 }
 
+/** Markdown the panel doesn't render: **bold** → ==mark==, other asterisks and backticks dropped. */
+const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "==$1==").replace(/[*`]/g, "");
+
+/** Main text plus at most one extra block, so a reply stays readable in the side panel. */
 function toBlocks(reply: MentorReply): MentorBlock[] {
-  const blocks: MentorBlock[] = [{ type: "text", text: reply.reply.replace(/\*\*(.+?)\*\*/g, "==$1==") }];
-  const points = reply.points.filter((p) => p.trim()).slice(0, 4);
+  const blocks: MentorBlock[] = [{ type: "text", text: clean(reply.reply) }];
+  const points = reply.points.map(clean).filter((p) => p.trim()).slice(0, 3);
   if (points.length) blocks.push({ type: "steps", items: points });
-  if (reply.example?.text.trim()) blocks.push({ type: "example", title: reply.example.title || null, text: reply.example.text });
-  if (reply.promptExample?.trim()) blocks.push({ type: "prompt", text: reply.promptExample });
+  else if (reply.example?.text.trim())
+    blocks.push({ type: "example", title: reply.example.title ? clean(reply.example.title) : null, text: clean(reply.example.text) });
+  else if (reply.promptExample?.trim()) blocks.push({ type: "prompt", text: reply.promptExample.replace(/[*`]/g, "") });
   return blocks;
 }
 
@@ -166,7 +171,7 @@ export async function reviewMistake(input: MistakeInput): Promise<MentorResult> 
     return {
       source: "llm",
       message: message(toBlocks(review), {
-        mistake: { ...mistakeBase, what: review.what, why: review.why, how: review.how },
+        mistake: { ...mistakeBase, what: clean(review.what), why: clean(review.why), how: clean(review.how) },
         extraTasks: followUp(review.followUpIndex),
         suggestions: review.suggestions.slice(0, 3),
       }),
