@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { AnswerBody, checkAnswer, exerciseIds, getExercise, getLesson, listCourses, NodeStatus, type Checked } from "../content/courses.ts";
 import { JournalEntry, reviewLesson } from "../ai/lesson-review.ts";
+import { issuePlanCertificateIfComplete, markPlanItemsDone } from "../certificates/plan-service.ts";
 import { issueCertificateIfComplete } from "../certificates/service.ts";
 import { db } from "../db/index.ts";
 import { exerciseAttempts, journalEntries, lessonCompletions, type ExerciseAttempt } from "../db/schema/index.ts";
@@ -150,6 +151,8 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
             nextLessonId: z.string().nullable(),
             /** Set when this completion finished the course (certificate issued now or earlier). */
             certificateId: z.uuid().nullable(),
+            /** Set when this completion finished the learner's whole learning plan (final certificate). */
+            planCertificateId: z.uuid().nullable(),
             /** The lesson review, saved to the journal. Rewritten on every completion (a retake updates it). */
             review: JournalEntry,
           }),
@@ -189,12 +192,15 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
           set: { entry: review, source: review.source, createdAt: new Date() },
         });
       const certificate = await issueCertificateIfComplete(db, req.user.sub, found.course.id);
+      await markPlanItemsDone(db, req.user.sub, found.lesson.id);
+      const planCertificate = await issuePlanCertificateIfComplete(db, req.user.sub);
       return {
         correctFirstTry,
         total: ids.length,
         nextLessonId: found.nextLessonId,
         review,
         certificateId: certificate?.id ?? null,
+        planCertificateId: planCertificate?.id ?? null,
       };
     },
   );
