@@ -4,3 +4,6 @@ export * from "./_shared.ts";
 export * from "./tasks.ts";
 export * from "./users.ts";
 export * from "./progress.ts";
+export * from "./onboarding.ts";
+export * from "./catalog.ts";
+export * from "./plans.ts";

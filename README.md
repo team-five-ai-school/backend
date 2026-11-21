@@ -21,6 +21,7 @@ Local Postgres in one command: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=
 - `GET /health`: app + DB check (Railway healthcheck), deployed commit
 - `GET /docs`: Swagger UI, generated from the Zod route schemas. Click Authorize: paste the API key (if set) and the JWT from `POST /auth/login`
 - `/auth/register`, `/auth/login`, `/auth/me`: email + password, returns a JWT. Other features are added by their owners (planned API: `../tasks/app-skeleton-spec.md`)
+- `/onboarding/*`, `/me/plan`, `/me/chaos-map`, `/me/routine-time`, `/catalog/*` (admin): onboarding → chaos map → learning plan. Contracts: [`docs/api-contracts.md`](docs/api-contracts.md)
 - `/tasks`: example CRUD used by the frontend `/examples/tasks` page. Remove both together.
 
 ## Code map
@@ -29,7 +30,22 @@ Local Postgres in one command: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=
 src/db/schema/<domain>.ts   tables + enums, one file per domain; export new ones from schema/index.ts
 src/plugins/auth.ts         JWT setup, requireAuth / requireRole hooks
 src/routes/<feature>.ts     one Fastify plugin per feature; each declares its full paths
-src/lib/                    password hashing, shared HTTP schemas (ErrorBody, IdParams, `secured`)
+src/lib/                    password hashing, shared HTTP schemas (ErrorBody, IdParams, `secured`), rate limiter
+src/config/onboarding.ts    tunable numbers: AI factors, limits
+src/seed/                   skill taxonomy + role templates (quiz with hour effects); upserted on every start
+src/domain/                 pure logic: quiz → hours, chaos map, plan builder + reranker hook, slot filling
+src/ai/                     the only place that calls models: models.ts (env), prompts/, schemas/, extract-tasks.ts
+src/onboarding/             service (DB) + request/response schemas
+src/catalog/, src/events/   lesson reader over the DB; in-process domain events (`lesson.published`)
+```
+
+## Tests
+
+`npm test` runs unit tests (`node:test`, mock models from `ai/test`). The e2e flow (`src/e2e`) runs only with `TEST_DATABASE_URL` set to a throwaway DB, because it truncates tables:
+
+```bash
+docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=app postgres:17-alpine
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5433/app npm test
 ```
 
 ## Auth
@@ -66,3 +82,7 @@ Two branches that both add a migration conflict in `drizzle/meta/_journal.json`.
 | `JWT_EXPIRES_IN` | Default `7d`, matches the frontend session cookie                            |
 | `CORS_ORIGINS` | Comma-separated origins, default `*`                                           |
 | `PORT`         | Set by Railway                                                                 |
+| `ANTHROPIC_API_KEY` | Optional. Without it, free-text parsing falls back to the role template   |
+| `AI_MODEL_EXTRACTION` | Model id for free text → tasks (e.g. `claude-haiku-5-5`). Unset = fallback |
+| `AI_MODEL_RERANK`, `AI_MODEL_MENTOR` | Reserved for the next AI steps                          |
+| `AI_TIMEOUT_MS` | Per-call timeout, default `15000`                                             |

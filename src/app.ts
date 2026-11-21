@@ -14,15 +14,27 @@ import { z } from "zod";
 import { db } from "./db/index.ts";
 import { env } from "./env.ts";
 import { registerAuth } from "./plugins/auth.ts";
+import { registerEventHandlers } from "./events/handlers.ts";
+import { DomainEvents } from "./events/index.ts";
+import { onboardingService } from "./onboarding/service.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { coursesRoutes } from "./routes/courses.ts";
 import { progressRoutes } from "./routes/progress.ts";
+import { catalogRoutes } from "./routes/catalog.ts";
+import { meRoutes } from "./routes/me.ts";
+import { onboardingRoutes, type OnboardingRoutesOptions } from "./routes/onboarding.ts";
 import { tasksRoutes } from "./routes/tasks.ts";
 
 const PUBLIC_PATHS = ["/health", "/docs"];
 
-export async function buildApp() {
-  const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
+export type BuildAppOptions = {
+  logger?: boolean;
+  /** Tests inject a mock model for free-text extraction. */
+  extractionModel?: OnboardingRoutesOptions["extractionModel"];
+};
+
+export async function buildApp(options: BuildAppOptions = {}) {
+  const app = Fastify({ logger: options.logger ?? true }).withTypeProvider<ZodTypeProvider>();
 
   // Zod schemas validate requests and serialize responses.
   app.setValidatorCompiler(validatorCompiler);
@@ -82,6 +94,14 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(coursesRoutes);
   await app.register(progressRoutes);
+
+  // Onboarding → chaos map → learning plan. Events are in-process (src/events), handlers stay idempotent.
+  const events = new DomainEvents(app.log);
+  registerEventHandlers(events, db, app.log);
+  const service = onboardingService(db);
+  await app.register(onboardingRoutes, { service, extractionModel: options.extractionModel });
+  await app.register(meRoutes, { service });
+  await app.register(catalogRoutes, { events });
 
   // Example resource, kept for the frontend /examples/tasks page. Remove both together.
   await app.register(tasksRoutes, { prefix: "/tasks" });

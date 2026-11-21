@@ -13,6 +13,14 @@ const schema = z.object({
   /** Token lifetime (ms-style string). Keep it in sync with the frontend session cookie max-age. */
   JWT_EXPIRES_IN: z.string().default("7d"),
   RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
+  /** Model provider key (Anthropic). Without it every AI step uses its deterministic fallback. */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** Model id per AI task. Unset = that task uses its fallback. */
+  AI_MODEL_EXTRACTION: z.string().min(1).optional(),
+  AI_MODEL_RERANK: z.string().min(1).optional(),
+  AI_MODEL_MENTOR: z.string().min(1).optional(),
+  /** Hard timeout for one model call, ms. */
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
 });
 
 const parsed = schema.parse(process.env);
