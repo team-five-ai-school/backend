@@ -63,14 +63,14 @@ export type MentorAskBody = z.infer<typeof MentorAskBody>;
 /* ───────── Model output: flat and easy to fill; code turns it into blocks ───────── */
 
 export const MentorReply = z.object({
-  reply: z.string().describe("The main answer, 1–4 short sentences, plain English. **bold** for the one key idea."),
-  points: z.array(z.string()).describe("0–4 short steps or checks, only if they help; [] otherwise"),
+  reply: z.string().describe("The main answer, 1–3 short sentences (under 60 words), plain English. **bold** for the one key idea."),
+  points: z.array(z.string()).describe("Up to 3 short steps or checks (under 12 words each) when steps are the most useful extra; otherwise []"),
   example: z
     .object({ title: z.string(), text: z.string() })
     .nullable()
-    .describe("One short before → after or work example, or null"),
-  promptExample: z.string().nullable().describe("A ready-to-copy example prompt for an AI tool, or null"),
-  suggestions: z.array(z.string()).describe("2–3 short follow-up questions the learner could ask next"),
+    .describe("One short before → after or work example (under 40 words) when an example is the most useful extra; otherwise null"),
+  promptExample: z.string().nullable().describe("A short ready-to-copy prompt (under 50 words) when the learner asks how to do something; otherwise null"),
+  suggestions: z.array(z.string()).describe("2–3 short follow-up questions (under 8 words each) the learner could ask next"),
 });
 export type MentorReply = z.infer<typeof MentorReply>;
 

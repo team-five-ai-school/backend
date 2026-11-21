@@ -29,8 +29,8 @@ export const JournalEntry = z.object({
 export type JournalEntry = z.infer<typeof JournalEntry>;
 
 const ReviewText = z.object({
-  summary: z.string().describe("1–2 sentences on how the lesson went"),
-  recommendations: z.array(z.string()).describe("1–3 concrete next steps, each tied to a real mistake or strength"),
+  summary: z.string().describe("1–2 short sentences (under 40 words) on how the lesson went"),
+  recommendations: z.array(z.string()).describe("1–3 concrete next steps, each one sentence under 25 words, tied to a real mistake or strength"),
 });
 
 type Attempt = { exerciseId: string; attempt: number; verdict: string; answer: unknown };
@@ -131,7 +131,13 @@ export async function reviewLesson(input: LessonReviewInput): Promise<JournalEnt
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
     });
-    return { ...base, summary: text.summary, recommendations: text.recommendations.slice(0, 3), source: "llm" };
+    const plain = (t: string) => t.replace(/[*`]/g, "").trim();
+    return {
+      ...base,
+      summary: plain(text.summary),
+      recommendations: text.recommendations.map(plain).filter(Boolean).slice(0, 3),
+      source: "llm",
+    };
   } catch (error) {
     return fallback(NoObjectGeneratedError.isInstance(error) ? "no_object" : describeError(error), resolved.modelId);
   }
