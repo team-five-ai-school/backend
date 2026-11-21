@@ -19,6 +19,8 @@ const schema = z.object({
   AI_MODEL_EXTRACTION: z.string().min(1).optional(),
   AI_MODEL_RERANK: z.string().min(1).optional(),
   AI_MODEL_MENTOR: z.string().min(1).optional(),
+  /** Local only: a simulated mentor model when there is no API key (src/ai/simulated.ts). Ignored in production. */
+  AI_SIMULATE: z.stringbool().default(false),
   /** Hard timeout for one model call, ms. */
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
 });
