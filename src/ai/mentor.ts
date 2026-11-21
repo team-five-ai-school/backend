@@ -133,7 +133,7 @@ export async function reviewMistake(input: MistakeInput): Promise<MentorResult> 
           { type: "steps", items: lesson.mentor.key_points.slice(0, 3) },
         ],
         {
-          mistake: { ...mistakeBase, what: `You answered: ${learnerAnswer}.`, why: exercise.hint, how: "Use the hint, then try the exercise again." },
+          mistake: { ...mistakeBase, what: `You answered: ${learnerAnswer.replace(/[.!?]+$/, "")}.`, why: exercise.hint, how: "Use the hint, then try the exercise again." },
           extraTasks: followUp(0),
           suggestions: ["Explain this in other words", "What should I look at first?"],
         },

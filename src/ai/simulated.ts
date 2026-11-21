@@ -33,7 +33,7 @@ function answer(keys: string[], prompt: Msg[]) {
   const lesson = lessonTitle(prompt);
 
   if (keys.includes("what")) {
-    const learner = /The learner answered: (.+)/.exec(user)?.[1] ?? "your answer";
+    const learner = (/The learner answered: (.+)/.exec(user)?.[1] ?? "your answer").replace(/[.!?]+$/, "");
     return {
       reply: `Close, but this answer leaves the assistant guessing. In **${lesson}** the key is to give the AI the facts it can't know.`,
       points: ["Re-read the question: what does the assistant need to know?", "Compare what each option tells the AI."],
