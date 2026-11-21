@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import type { LanguageModel } from "ai";
 
 import { env } from "../env.ts";
+import { simulatedMentorModel } from "./simulated.ts";
 
 /**
  * The single access point to models. Provider key and model ids come only from env; a task without a
@@ -21,6 +22,9 @@ export type ResolvedModel = { model: LanguageModel; modelId: string } | { model:
 
 export function getModel(task: AiTask): ResolvedModel {
   const modelId = modelIdFor[task];
+  if (!anthropic && task === "mentor" && env.AI_SIMULATE && env.NODE_ENV !== "production") {
+    return { model: simulatedMentorModel(), modelId: "simulated" };
+  }
   if (!anthropic) return { model: null, reason: "no_api_key" };
   if (!modelId) return { model: null, reason: `no_model_for_${task}` };
   return { model: anthropic(modelId), modelId };
