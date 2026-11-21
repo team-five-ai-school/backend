@@ -18,6 +18,7 @@ import { registerEventHandlers } from "./events/handlers.ts";
 import { DomainEvents } from "./events/index.ts";
 import { onboardingService } from "./onboarding/service.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { certificatesRoutes } from "./routes/certificates.ts";
 import { coursesRoutes } from "./routes/courses.ts";
 import { progressRoutes } from "./routes/progress.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
@@ -94,6 +95,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(authRoutes);
   await app.register(coursesRoutes);
   await app.register(progressRoutes);
+  await app.register(certificatesRoutes);
 
   // Onboarding → chaos map → learning plan. Events are in-process (src/events), handlers stay idempotent.
   const events = new DomainEvents(app.log);

@@ -29,6 +29,13 @@
       "when": 1795269741758,
       "tag": "0003_onboarding_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795270831636,
+      "tag": "0004_certificates",
+      "breakpoints": true
     }
   ]
 }

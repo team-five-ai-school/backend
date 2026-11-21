@@ -3,6 +3,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { AnswerBody, checkAnswer, exerciseIds, getExercise, getLesson, listCourses, NodeStatus, type Checked } from "../content/courses.ts";
+import { issueCertificateIfComplete } from "../certificates/service.ts";
 import { db } from "../db/index.ts";
 import { exerciseAttempts, lessonCompletions, type ExerciseAttempt } from "../db/schema/index.ts";
 import { error, ErrorBody, secured } from "../lib/http.ts";
@@ -142,7 +143,13 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
         security: secured,
         params: z.object({ lessonId: z.string() }),
         response: {
-          200: z.object({ correctFirstTry: z.number().int(), total: z.number().int(), nextLessonId: z.string().nullable() }),
+          200: z.object({
+            correctFirstTry: z.number().int(),
+            total: z.number().int(),
+            nextLessonId: z.string().nullable(),
+            /** Set when this completion finished the course (certificate issued now or earlier). */
+            certificateId: z.uuid().nullable(),
+          }),
           404: ErrorBody,
           409: ErrorBody,
         },
@@ -169,7 +176,8 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
           target: [lessonCompletions.userId, lessonCompletions.lessonId],
           set: { correctFirstTry, total: ids.length, completedAt: new Date() },
         });
-      return { correctFirstTry, total: ids.length, nextLessonId: found.nextLessonId };
+      const certificate = await issueCertificateIfComplete(db, req.user.sub, found.course.id);
+      return { correctFirstTry, total: ids.length, nextLessonId: found.nextLessonId, certificateId: certificate?.id ?? null };
     },
   );
 };
