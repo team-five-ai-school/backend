@@ -5,7 +5,7 @@ export const ErrorBody = z.object({ error: z.string() });
 
 export const IdParams = z.object({ id: z.uuid() });
 
-/** Swagger marker for routes behind requireAuth: /docs sends the bearer token (and the API key, if set). */
-export const secured = [{ apiKey: [], bearerAuth: [] }];
+/** Swagger marker for routes behind requireAuth: /docs sends the bearer token. */
+export const secured = [{ bearerAuth: [] }];
 
 export const error = (message: string) => ({ error: message });

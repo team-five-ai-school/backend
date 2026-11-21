@@ -33,8 +33,15 @@
     {
       "idx": 4,
       "version": "7",
-      "when": 1795270831636,
-      "tag": "0004_certificates",
+      "when": 1795270681846,
+      "tag": "0004_journal_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795272385417,
+      "tag": "0005_certificates",
       "breakpoints": true
     }
   ]

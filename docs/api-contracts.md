@@ -52,7 +52,7 @@ The quiz is returned without its hour effects; those stay on the server (`src/se
 The body is one JSON document that grows one complete task at a time, for `useObject` from `@ai-sdk/react`:
 
 ```json
-{"tasks":[{"title":"Заявки з Instagram у CRM","skillSlug":"messages-to-crm","hoursPerWeek":6,"aiCapability":"auto"}, …],"source":"llm"}
+{"tasks":[{"title":"Instagram leads into the CRM","skillSlug":"messages-to-crm","hoursPerWeek":6,"aiCapability":"auto"}, …],"source":"llm"}
 ```
 
 - `skillSlug` is restricted to skills in the DB (enum in the schema); hours are clamped to 0–40; at most 12 tasks.
@@ -72,7 +72,7 @@ WorkTask = { id, title, skillSlug, chaosType, hoursPerWeek, aiCapability, source
 ChaosMap = {
   id, version, createdAt,
   lanes: [{                     // one per skill (tasks with aiCapability ≠ human), sorted by hoursAiCan desc,
-    id, kind: "skill" | "human",//  plus one "human" lane «Твоє рішення» (skillSlug and chaosType null)
+    id, kind: "skill" | "human",//  plus one "human" lane "Your decision" (skillSlug and chaosType null)
     skillSlug, title, chaosType, taskIds, hoursTotal, hoursAiCan, aiSharePercent,
   }],
   totals: { hoursTotal, hoursAiCan, hoursHuman, aiSharePercent },   // hoursHuman = hoursTotal − hoursAiCan
@@ -82,7 +82,7 @@ Plan = {
   id, version, status: "active" | "superseded", createdAt,
   items: [{
     id, order, skillSlug, skillTitle,
-    lessonId: string | null, lessonTitle: string | null,
+    lessonId: string | null, lessonTitle: string | null, lessonSlug: string | null,   // slug = content lesson id
     status: "slot" | "ready" | "in_progress" | "done",   // slot = no published lesson for this skill yet
     sourceTaskIds, estimatedHoursSaved, rationale: string | null,
   }],
@@ -110,10 +110,14 @@ All need `Authorization: Bearer <jwt>` (the frontend proxy adds it from the sess
 
 New plans pick lessons with `bestLessonFor(skill, role)`: published, tagged with the skill; a lesson for the person's role first, then the shorter one.
 
+### Lessons from `content/courses.json`
+
+On every start the backend puts the content lessons tagged in `src/catalog/content-skill-map.ts` into the catalog as published lessons (untagged ones stay drafts) and gives every open slot its best lesson for the plan's role. Plan items carry `lessonSlug` (the content lesson id) for the link `/lessons/:lessonSlug`. Roles come only from role-specific courses (`stage: "role"`: `small-business` → `small_business_owner`, `marketing` → `sales_manager`). The tags will move to the course frontmatter later.
+
 ## Extension points (not built yet)
 
 - `PlanReranker` (`src/domain/plan.ts`): an LLM step gets only the candidate ids (skill slugs) and returns an order + `rationale`; `applyRerank` drops ids that are not candidates. Today: `IdentityReranker`.
 - `AI_MODEL_RERANK`, `AI_MODEL_MENTOR` env slots in `src/ai/models.ts`.
 - `DomainEvents` (`src/events`): in-process today; swap for a queue behind the same interface. Planned event: `exercise.failed` for the Mentor.
 - Embedding search for lessons: `lessonsForSkills` in `src/catalog/index.ts` is the place to replace.
-- Voice input (STT): the frontend shows a disabled «Голосом: скоро» button.
+- Voice input (STT): the frontend shows a disabled "Voice: coming soon" button.

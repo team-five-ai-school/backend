@@ -10,19 +10,53 @@ const skills = [
   { slug: "summarize-reports", title: "Reports", description: "d" },
   { slug: "draft-replies", title: "Replies", description: "d" },
 ];
-const fallbackTasks: ExtractedTask[] = [{ title: "Шаблон", skillSlug: "summarize-reports", hoursPerWeek: 2, aiCapability: "assist" }];
-const freeText = "Щодня переношу заявки з інстаграму в таблицю. Мій телефон 0501234567.";
+const fallbackTasks: ExtractedTask[] = [
+  {
+    title: "Template task",
+    skillSlug: "summarize-reports",
+    hoursPerWeek: 2,
+    aiCapability: "assist",
+  },
+];
+const freeText = "Every day I copy Instagram leads into a spreadsheet. My phone is 0501234567.";
 
 const modelOutput = {
   tasks: [
-    { title: "Заявки з Instagram у таблицю", skillSlug: "messages-to-crm", hoursPerWeek: 5, aiCapability: "auto" },
-    { title: "Звіт керівнику", skillSlug: "summarize-reports", hoursPerWeek: 55, aiCapability: "assist" },
-    { title: "Знижки", skillSlug: "draft-replies", hoursPerWeek: 1.3, aiCapability: "human" },
+    {
+      title: "Instagram leads into a spreadsheet",
+      skillSlug: "messages-to-crm",
+      hoursPerWeek: 5,
+      aiCapability: "auto",
+    },
+    {
+      title: "Report for my manager",
+      skillSlug: "summarize-reports",
+      hoursPerWeek: 55,
+      aiCapability: "assist",
+    },
+    {
+      title: "Discounts",
+      skillSlug: "draft-replies",
+      hoursPerWeek: 1.3,
+      aiCapability: "human",
+    },
   ],
 };
 
-function input(model: ExtractionInput["model"], log = memoryLogger(), extra: Partial<ExtractionInput> = {}): ExtractionInput {
-  return { freeText, roleTitle: "Менеджер з продажу", skills, fallbackTasks, log, model, ...extra };
+function input(
+  model: ExtractionInput["model"],
+  log = memoryLogger(),
+  extra: Partial<ExtractionInput> = {},
+): ExtractionInput {
+  return {
+    freeText,
+    roleTitle: "Sales manager",
+    skills,
+    fallbackTasks,
+    log,
+    model,
+    ...extra,
+  };
 }
 
 async function drain(gen: AsyncGenerator<string>) {

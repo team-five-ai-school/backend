@@ -78,6 +78,8 @@ export const PlanItemOut = z.object({
   skillTitle: z.string(),
   lessonId: z.uuid().nullable(),
   lessonTitle: z.string().nullable(),
+  /** Content lesson id: open it at /lessons/:lessonSlug. */
+  lessonSlug: z.string().nullable(),
   status: z.enum(PLAN_ITEM_STATUSES),
   sourceTaskIds: z.array(z.uuid()),
   estimatedHoursSaved: z.number(),

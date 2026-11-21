@@ -10,7 +10,7 @@ import { AI_CAPABILITIES } from "../../db/schema/index.ts";
  */
 export function makeExtractionSchema(skillSlugs: readonly [string, ...string[]]) {
   const task = z.object({
-    title: z.string().describe("Short task name in Ukrainian, how the person would say it, 2–8 words"),
+    title: z.string().describe("Short task name in English, close to how the person would say it, 2–8 words"),
     skillSlug: z.enum(skillSlugs).describe("The skill this task needs"),
     hoursPerWeek: z
       .number()

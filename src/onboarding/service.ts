@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull, max, ne, or } from "drizzle-orm";
 
 import type { ExtractedTask } from "../ai/schemas/work-tasks.ts";
-import { dbCatalogReader, lessonTitles } from "../catalog/index.ts";
+import { dbCatalogReader, lessonRefs } from "../catalog/index.ts";
 import type { Db, Tx } from "../db/index.ts";
 import {
   chaosMaps,
@@ -113,7 +113,10 @@ export function onboardingService(db: Db, deps: OnboardingDeps = {}) {
       db.select().from(planItems).where(eq(planItems.planId, plan.id)).orderBy(asc(planItems.order)),
       allSkills(),
     ]);
-    const titles = await lessonTitles(db, items.flatMap((i) => (i.lessonId ? [i.lessonId] : [])));
+    const refs = await lessonRefs(
+      db,
+      items.flatMap((i) => (i.lessonId ? [i.lessonId] : [])),
+    );
     const skillTitle = new Map(skillRows.map((k) => [k.slug, k.title]));
     return {
       id: plan.id,
@@ -126,7 +129,8 @@ export function onboardingService(db: Db, deps: OnboardingDeps = {}) {
         skillSlug: i.skillSlug,
         skillTitle: skillTitle.get(i.skillSlug) ?? i.skillSlug,
         lessonId: i.lessonId,
-        lessonTitle: i.lessonId ? (titles.get(i.lessonId) ?? null) : null,
+        lessonTitle: i.lessonId ? (refs.get(i.lessonId)?.title ?? null) : null,
+        lessonSlug: i.lessonId ? (refs.get(i.lessonId)?.slug ?? null) : null,
         status: i.status,
         sourceTaskIds: i.sourceTaskIds,
         estimatedHoursSaved: i.estimatedHoursSaved,

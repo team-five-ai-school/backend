@@ -44,7 +44,12 @@ const SourceLesson = z.object({
   skills: z.array(z.string()),
   blocks: z.array(z.union([Card, SourceExercise])),
   practice: z.unknown(),
-  mentor: z.unknown(),
+  /** Grounding for the AI mentor; never sent to the browser. */
+  mentor: z.object({
+    common_mistakes: z.array(z.string()),
+    key_points: z.array(z.string()),
+    follow_up_tasks: z.array(z.string()),
+  }),
 });
 const SourceCourse = z.object({
   id: z.string(),
@@ -63,8 +68,9 @@ const SourceCourse = z.object({
 });
 const SourceFile = z.object({ courses: z.array(SourceCourse) });
 
-type SourceCourse = z.infer<typeof SourceCourse>;
-type SourceLesson = z.infer<typeof SourceLesson>;
+export type SourceCourse = z.infer<typeof SourceCourse>;
+export type SourceLesson = z.infer<typeof SourceLesson>;
+export type { SourceExercise };
 
 const file = SourceFile.parse(JSON.parse(readFileSync(new URL("../../content/courses.json", import.meta.url), "utf8")));
 

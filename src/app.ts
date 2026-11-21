@@ -23,10 +23,10 @@ import { coursesRoutes } from "./routes/courses.ts";
 import { progressRoutes } from "./routes/progress.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { meRoutes } from "./routes/me.ts";
+import { mentorRoutes } from "./routes/mentor.ts";
 import { onboardingRoutes, type OnboardingRoutesOptions } from "./routes/onboarding.ts";
 import { tasksRoutes } from "./routes/tasks.ts";
 
-const PUBLIC_PATHS = ["/health", "/docs"];
 
 export type BuildAppOptions = {
   logger?: boolean;
@@ -62,22 +62,14 @@ export async function buildApp(options: BuildAppOptions = {}) {
       info: { title: "Team Five API", version: "0.1.0" },
       components: {
         securitySchemes: {
-          apiKey: { type: "apiKey", in: "header", name: "x-api-key" },
           // Paste the `token` from POST /auth/login. Routes marked with `security: secured` send it.
           bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
         },
       },
-      security: [{ apiKey: [] }],
     },
     transform: jsonSchemaTransform,
   });
   await app.register(swaggerUi, { routePrefix: "/docs" });
-
-  // If API_KEY is set, every route except /health and /docs requires the X-Api-Key header.
-  app.addHook("onRequest", async (req, reply) => {
-    if (!env.API_KEY || PUBLIC_PATHS.some((p) => req.url.startsWith(p))) return;
-    if (req.headers["x-api-key"] !== env.API_KEY) return reply.code(401).send({ error: "Invalid API key" });
-  });
 
   app.get(
     "/health",
@@ -95,6 +87,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(authRoutes);
   await app.register(coursesRoutes);
   await app.register(progressRoutes);
+  await app.register(mentorRoutes);
   await app.register(certificatesRoutes);
 
   // Onboarding → chaos map → learning plan. Events are in-process (src/events), handlers stay idempotent.

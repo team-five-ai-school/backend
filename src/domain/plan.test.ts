@@ -5,13 +5,14 @@ import { applyRerank, IdentityReranker, RuleBasedPlanBuilder, type CatalogReader
 
 type FakeLesson = LessonRef & { skillSlugs: string[]; roles: string[]; published: boolean };
 
-/** Same rules as the DB reader: published, has the skill; role match first, then shorter. */
+/** Same rules as the DB reader: own role, then generic, then other roles; shorter first. */
+const rank = (l: FakeLesson, role: string) => (l.roles.includes(role) ? 0 : l.roles.length === 0 ? 1 : 2);
 function fakeCatalog(lessons: FakeLesson[]): CatalogReader {
   return {
     async bestLessonFor(skill, role) {
       const candidates = lessons
         .filter((l) => l.published && l.skillSlugs.includes(skill))
-        .sort((a, b) => Number(b.roles.includes(role)) - Number(a.roles.includes(role)) || a.durationMin - b.durationMin);
+        .sort((a, b) => rank(a, role) - rank(b, role) || a.durationMin - b.durationMin);
       const best = candidates[0];
       return best ? { id: best.id, title: best.title, durationMin: best.durationMin } : null;
     },
@@ -54,6 +55,29 @@ describe("RuleBasedPlanBuilder", () => {
     assert.equal(plan[0]!.status, "ready");
     assert.equal(plan[1]!.lessonId, "L-remind-4");
     assert.equal(plan[2]!.status, "slot");
+  });
+
+  it("prefers a generic lesson over one made for another role", async () => {
+    const catalog = fakeCatalog([
+      {
+        id: "L-other-role",
+        title: "a",
+        durationMin: 3,
+        skillSlugs: ["report"],
+        roles: ["sales_manager"],
+        published: true,
+      },
+      {
+        id: "L-generic",
+        title: "b",
+        durationMin: 6,
+        skillSlugs: ["report"],
+        roles: [],
+        published: true,
+      },
+    ]);
+    const plan = await new RuleBasedPlanBuilder().build({ tasks, role: "accountant" }, catalog);
+    assert.equal(plan.find((p) => p.skillSlug === "report")!.lessonId, "L-generic");
   });
 });
 

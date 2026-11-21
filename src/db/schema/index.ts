@@ -8,3 +8,4 @@ export * from "./progress.ts";
 export * from "./onboarding.ts";
 export * from "./catalog.ts";
 export * from "./plans.ts";
+export * from "./journal.ts";
