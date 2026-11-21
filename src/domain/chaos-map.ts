@@ -12,7 +12,7 @@ export type SkillInfo = { title: string; chaosType: ChaosType };
 export type AiFactors = Record<AiCapability, number>;
 
 export const HUMAN_LANE_ID = "human";
-export const HUMAN_LANE_TITLE = "Твоє рішення";
+export const HUMAN_LANE_TITLE = "Your decision";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const percent = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);

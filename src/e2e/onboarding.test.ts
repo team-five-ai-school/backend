@@ -11,6 +11,7 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
   let app: Awaited<ReturnType<typeof import("../app.ts").buildApp>>;
   let close: () => Promise<void>;
   let setAdmin: (email: string) => Promise<void>;
+  let syncContent: () => Promise<{ lessons: number; filled: number }>;
 
   before(async () => {
     process.env.DATABASE_URL = TEST_DB;
@@ -32,9 +33,24 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
     await seedReferenceData();
     const output = {
       tasks: [
-        { title: "Заявки з Instagram у CRM", skillSlug: "messages-to-crm", hoursPerWeek: 6, aiCapability: "auto" },
-        { title: "Звіт по воронці", skillSlug: "summarize-reports", hoursPerWeek: 3, aiCapability: "assist" },
-        { title: "Знижки для постійних", skillSlug: "draft-replies", hoursPerWeek: 2, aiCapability: "human" },
+        {
+          title: "Instagram leads into the CRM",
+          skillSlug: "messages-to-crm",
+          hoursPerWeek: 6,
+          aiCapability: "auto",
+        },
+        {
+          title: "Funnel report",
+          skillSlug: "summarize-reports",
+          hoursPerWeek: 3,
+          aiCapability: "assist",
+        },
+        {
+          title: "Discounts for regulars",
+          skillSlug: "draft-replies",
+          hoursPerWeek: 2,
+          aiCapability: "human",
+        },
       ],
     };
     app = await buildApp({ logger: false, extractionModel: { model: mockStreamModel(JSON.stringify(output)), modelId: "mock" } });
@@ -42,6 +58,8 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
       await app.close();
       await db.$client.end();
     };
+    const { syncContentLessons } = await import("../catalog/sync-content.ts");
+    syncContent = () => syncContentLessons(db);
     setAdmin = async (email) => {
       await db.update(users).set({ role: "admin" }).where(eq(users.email, email));
     };
@@ -93,7 +111,9 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
     const described = await app.inject({
       method: "POST",
       url: `/onboarding/sessions/${sessionId}/describe`,
-      payload: { freeText: "Щодня переношу заявки з інстаграму в CRM, роблю звіт по воронці і вирішую про знижки." },
+      payload: {
+        freeText: "Every day I move Instagram leads into the CRM, write the funnel report and decide on discounts.",
+      },
     });
     assert.equal(described.statusCode, 200, described.body);
     assert.match(described.headers["content-type"] as string, /text\/plain/);
@@ -167,13 +187,28 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
     assert.equal((await app.inject({ method: "POST", url: "/catalog/courses", headers: auth, payload: { slug: "x", title: "x" } })).statusCode, 403);
 
     const course = (
-      await app.inject({ method: "POST", url: "/catalog/courses", headers: adminAuth, payload: { slug: `c-${Date.now()}`, title: "CRM без рутини" } })
+      await app.inject({
+        method: "POST",
+        url: "/catalog/courses",
+        headers: adminAuth,
+        payload: {
+          slug: `c-${Date.now()}`,
+          title: "CRM without the routine",
+        },
+      })
     ).json();
     const lesson = await app.inject({
       method: "POST",
       url: "/catalog/lessons",
       headers: adminAuth,
-      payload: { courseId: course.id, slug: `l-${Date.now()}`, title: "Заявки в CRM за 5 хвилин", skillSlugs: ["messages-to-crm"], roles: ["sales_manager"], durationMin: 5 },
+      payload: {
+        courseId: course.id,
+        slug: `l-${Date.now()}`,
+        title: "Leads into the CRM in 5 minutes",
+        skillSlugs: ["messages-to-crm"],
+        roles: ["sales_manager"],
+        durationMin: 5,
+      },
     });
     assert.equal(lesson.statusCode, 201, lesson.body);
     const lessonId = lesson.json().id;
@@ -186,7 +221,7 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
     const [first, second] = filled.items;
     assert.equal(first.status, "ready");
     assert.equal(first.lessonId, lessonId);
-    assert.equal(first.lessonTitle, "Заявки в CRM за 5 хвилин");
+    assert.equal(first.lessonTitle, "Leads into the CRM in 5 minutes");
     assert.equal(second.status, "slot");
   });
 
@@ -203,6 +238,38 @@ describe("onboarding flow (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL i
     const report = tasks.find((t: { skillSlug: string }) => t.skillSlug === "summarize-reports");
     assert.equal(report.hoursPerWeek, 3); // 2 × 1.6 = 3.2 → 3
     assert.equal(chaosMap.totals.hoursTotal, 15);
+  });
+
+  it("content lessons from courses.json fill open slots and new plans, by role", async () => {
+    // The sales manager from the first test still has an open "summarize-reports" slot.
+    const first = await syncContent();
+    assert.ok(first.lessons >= 15, `synced ${first.lessons} lessons`);
+    assert.ok(first.filled >= 1, "the open slot got a lesson");
+    assert.deepEqual(await syncContent().then((r) => r.filled), 0, "second sync changes nothing");
+
+    const { sessionId } = (
+      await app.inject({
+        method: "POST",
+        url: "/onboarding/sessions",
+        payload: { role: "small_business_owner" },
+      })
+    ).json();
+    const { plan } = (
+      await app.inject({
+        method: "POST",
+        url: `/onboarding/sessions/${sessionId}/complete`,
+      })
+    ).json();
+    const bySkill = Object.fromEntries(plan.items.map((i: { skillSlug: string }) => [i.skillSlug, i]));
+    // Role match wins: the small-business course over the generic assistant lesson.
+    assert.equal(bySkill["faq-answers"].lessonSlug, "ai-for-small-business-l1");
+    assert.equal(bySkill["faq-answers"].status, "ready");
+    assert.equal(bySkill["explain-table-data"].lessonSlug, "ai-for-small-business-l3");
+    // Not the marketing course (another role): the generic lesson.
+    assert.equal(bySkill["summarize-reports"].lessonSlug, "ai-in-office-tools-l3");
+    // No lesson teaches scheduling yet: it stays a slot.
+    assert.equal(bySkill["schedule-planning"].status, "slot");
+    assert.equal(bySkill["schedule-planning"].lessonSlug, null);
   });
 
   it("rejects an unknown role and a missing session", async () => {

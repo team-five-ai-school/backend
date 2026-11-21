@@ -17,7 +17,10 @@ export type PlanItemDraft = {
 
 /** Read side of the catalog the plan needs. Implemented over the DB in src/catalog/reader.ts. */
 export interface CatalogReader {
-  /** Best published lesson for a skill: role match first, then the shorter lesson. null = none yet. */
+  /**
+   * Best published lesson for a skill: one made for this role, then a generic one (no roles), then one
+   * made for another role; within each group the shorter lesson. null = none yet.
+   */
   bestLessonFor(skillSlug: string, role: string): Promise<LessonRef | null>;
 }
 
