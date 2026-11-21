@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { AnswerBody, checkAnswer, exerciseIds, getExercise, getLesson, listCourses, NodeStatus, type Checked } from "../content/courses.ts";
 import { JournalEntry, reviewLesson } from "../ai/lesson-review.ts";
+import { issueCertificateIfComplete } from "../certificates/service.ts";
 import { db } from "../db/index.ts";
 import { exerciseAttempts, journalEntries, lessonCompletions, type ExerciseAttempt } from "../db/schema/index.ts";
 import { error, ErrorBody, secured } from "../lib/http.ts";
@@ -147,6 +148,8 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
             correctFirstTry: z.number().int(),
             total: z.number().int(),
             nextLessonId: z.string().nullable(),
+            /** Set when this completion finished the course (certificate issued now or earlier). */
+            certificateId: z.uuid().nullable(),
             /** The lesson review, saved to the journal. Rewritten on every completion (a retake updates it). */
             review: JournalEntry,
           }),
@@ -185,7 +188,14 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
           target: [journalEntries.userId, journalEntries.lessonId],
           set: { entry: review, source: review.source, createdAt: new Date() },
         });
-      return { correctFirstTry, total: ids.length, nextLessonId: found.nextLessonId, review };
+      const certificate = await issueCertificateIfComplete(db, req.user.sub, found.course.id);
+      return {
+        correctFirstTry,
+        total: ids.length,
+        nextLessonId: found.nextLessonId,
+        review,
+        certificateId: certificate?.id ?? null,
+      };
     },
   );
 

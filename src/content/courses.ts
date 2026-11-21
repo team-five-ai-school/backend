@@ -57,6 +57,8 @@ const SourceCourse = z.object({
   track: z.string(),
   level: z.enum(["beginner", "intermediate", "advanced"]),
   description: z.string(),
+  /** Name printed on the course certificate. */
+  certificate: z.string(),
   tools: z.array(z.string()),
   recommended_for: z.array(z.string()),
   stage: z.string(),
