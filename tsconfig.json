@@ -10,5 +10,9 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "drizzle.config.ts"]
+  "include": [
+    "src",
+    "evals",
+    "drizzle.config.ts"
+  ]
 }

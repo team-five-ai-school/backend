@@ -15,7 +15,8 @@
     "db:studio": "drizzle-kit studio",
     "content:sync": "node scripts/sync-content.mjs",
     "db:seed": "node --env-file-if-exists=.env src/seed/index.ts",
-    "test": "node --test --test-concurrency=1 \"src/**/*.test.ts\""
+    "test": "node --test --test-concurrency=1 \"src/**/*.test.ts\"",
+    "evals": "node --env-file-if-exists=.env evals/run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.107",
