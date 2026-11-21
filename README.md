@@ -77,7 +77,6 @@ Two branches that both add a migration conflict in `drizzle/meta/_journal.json`.
 | Var            | What                                                                           |
 | -------------- | ------------------------------------------------------------------------------ |
 | `DATABASE_URL` | Postgres URL. On Railway: `${{Postgres.DATABASE_URL}}` (set already)           |
-| `API_KEY`      | Optional. If set, every route except `/health`, `/docs` requires `X-Api-Key`   |
 | `JWT_SECRET`   | **Required in production** (≥ 32 chars, `openssl rand -base64 48`). Set it on Railway before deploying, or the service will not start |
 | `JWT_EXPIRES_IN` | Default `7d`, matches the frontend session cookie                            |
 | `CORS_ORIGINS` | Comma-separated origins, default `*`                                           |

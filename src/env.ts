@@ -4,8 +4,6 @@ const schema = z.object({
   NODE_ENV: z.string().default("development"),
   DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/app"),
   PORT: z.coerce.number().default(8000),
-  /** If set, every route except /health requires the X-Api-Key header. */
-  API_KEY: z.string().min(1).optional(),
   /** Comma-separated origins, "*" for any. */
   CORS_ORIGINS: z.string().default("*"),
   /** Signs user JWTs. Required in production; generate with `openssl rand -base64 48`. */
