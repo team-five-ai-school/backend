@@ -1,10 +1,11 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { AnswerBody, checkAnswer, exerciseIds, getExercise, getLesson, listCourses, NodeStatus, type Checked } from "../content/courses.ts";
+import { JournalEntry, reviewLesson } from "../ai/lesson-review.ts";
 import { db } from "../db/index.ts";
-import { exerciseAttempts, lessonCompletions, type ExerciseAttempt } from "../db/schema/index.ts";
+import { exerciseAttempts, journalEntries, lessonCompletions, type ExerciseAttempt } from "../db/schema/index.ts";
 import { error, ErrorBody, secured } from "../lib/http.ts";
 import { requireAuth } from "../plugins/auth.ts";
 
@@ -142,7 +143,13 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
         security: secured,
         params: z.object({ lessonId: z.string() }),
         response: {
-          200: z.object({ correctFirstTry: z.number().int(), total: z.number().int(), nextLessonId: z.string().nullable() }),
+          200: z.object({
+            correctFirstTry: z.number().int(),
+            total: z.number().int(),
+            nextLessonId: z.string().nullable(),
+            /** The lesson review, saved to the journal. Rewritten on every completion (a retake updates it). */
+            review: JournalEntry,
+          }),
           404: ErrorBody,
           409: ErrorBody,
         },
@@ -169,7 +176,77 @@ export const progressRoutes: FastifyPluginAsyncZod = async (app) => {
           target: [lessonCompletions.userId, lessonCompletions.lessonId],
           set: { correctFirstTry, total: ids.length, completedAt: new Date() },
         });
-      return { correctFirstTry, total: ids.length, nextLessonId: found.nextLessonId };
+
+      const review = await reviewLesson({ lesson: found.lesson, courseId: found.course.id, attempts, log: req.log });
+      await db
+        .insert(journalEntries)
+        .values({ userId: req.user.sub, lessonId: found.lesson.id, courseId: found.course.id, entry: review, source: review.source })
+        .onConflictDoUpdate({
+          target: [journalEntries.userId, journalEntries.lessonId],
+          set: { entry: review, source: review.source, createdAt: new Date() },
+        });
+      return { correctFirstTry, total: ids.length, nextLessonId: found.nextLessonId, review };
+    },
+  );
+
+  // The saved review of one lesson (the learner can open it any time after finishing).
+  app.get(
+    "/lessons/:lessonId/review",
+    {
+      onRequest: requireAuth,
+      schema: {
+        tags: ["progress"],
+        security: secured,
+        params: z.object({ lessonId: z.string() }),
+        response: { 200: JournalEntry, 404: ErrorBody },
+      },
+    },
+    async (req, reply) => {
+      const [row] = await db
+        .select()
+        .from(journalEntries)
+        .where(and(eq(journalEntries.userId, req.user.sub), eq(journalEntries.lessonId, req.params.lessonId)));
+      if (!row) return reply.code(404).send(error("No review yet: finish the lesson first"));
+      return row.entry as JournalEntry;
+    },
+  );
+
+  // All saved reviews, newest first (the journal on the progress screen).
+  app.get(
+    "/me/journal",
+    {
+      onRequest: requireAuth,
+      schema: { tags: ["progress"], security: secured, response: { 200: z.array(JournalEntry) } },
+    },
+    async (req) => {
+      const rows = await db
+        .select()
+        .from(journalEntries)
+        .where(eq(journalEntries.userId, req.user.sub))
+        .orderBy(desc(journalEntries.createdAt));
+      return rows.map((r) => r.entry as JournalEntry);
+    },
+  );
+
+  // Start a lesson again: clears this lesson's answers so they can be given and scored anew.
+  // The completion and the saved review stay until the retake is completed, which overwrites them.
+  app.post(
+    "/lessons/:lessonId/retake",
+    {
+      onRequest: requireAuth,
+      schema: {
+        tags: ["progress"],
+        security: secured,
+        params: z.object({ lessonId: z.string() }),
+        response: { 204: z.null(), 404: ErrorBody },
+      },
+    },
+    async (req, reply) => {
+      if (!getLesson(req.params.lessonId)) return reply.code(404).send(error("Lesson not found"));
+      await db
+        .delete(exerciseAttempts)
+        .where(and(eq(exerciseAttempts.userId, req.user.sub), eq(exerciseAttempts.lessonId, req.params.lessonId)));
+      return reply.code(204).send(null);
     },
   );
 };
