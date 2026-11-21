@@ -1,0 +1,5 @@
+// Single entry point for drizzle-kit (drizzle.config.ts) and the runtime client (src/db/index.ts).
+// One file per domain keeps parallel PRs from conflicting. Export every new table and enum here.
+export * from "./_shared.ts";
+export * from "./tasks.ts";
+export * from "./users.ts";
