@@ -1,6 +1,6 @@
 // DEV ONLY: completes the first courses for an existing user and issues their certificates.
 // Usage: DATABASE_URL=postgresql://...localhost... node src/seed/demo-certificates.ts [email] [fullCourses=3]
-// Refuses to run unless the database host is local. Idempotent.
+// Refuses to run unless the database host is local (override: ALLOW_REMOTE_SEED=1). Idempotent.
 import { eq } from "drizzle-orm";
 
 import { issueCertificateIfComplete } from "../certificates/service.ts";
@@ -9,7 +9,7 @@ import { db } from "../db/index.ts";
 import { lessonCompletions, users } from "../db/schema/index.ts";
 
 const host = new URL(process.env.DATABASE_URL ?? "postgresql://localhost").hostname;
-if (!["localhost", "127.0.0.1"].includes(host)) throw new Error(`Refusing to seed demo data into non-local database (${host})`);
+if (!["localhost", "127.0.0.1"].includes(host) && process.env.ALLOW_REMOTE_SEED !== "1") throw new Error(`Refusing to seed demo data into non-local database (${host}). Set ALLOW_REMOTE_SEED=1 to override`);
 
 const email = (process.argv[2] ?? "admin@example.com").toLowerCase();
 const fullCourses = Number(process.argv[3] ?? 3);

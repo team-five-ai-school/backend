@@ -2,6 +2,7 @@
 // One file per domain keeps parallel PRs from conflicting. Export every new table and enum here.
 export * from "./_shared.ts";
 export * from "./certificates.ts";
+export * from "./plan-certificates.ts";
 export * from "./tasks.ts";
 export * from "./users.ts";
 export * from "./progress.ts";

@@ -82,4 +82,48 @@ describe("certificates (e2e)", { skip: TEST_DB ? false : "TEST_DATABASE_URL not 
     assert.equal((await app.inject({ method: "GET", url: `/certificates/${crypto.randomUUID()}` })).statusCode, 404);
     assert.equal((await app.inject({ method: "GET", url: "/certificates" })).statusCode, 401);
   });
+
+  it("issues the final certificate only when every plan item is done, once, with a frozen skill list", async () => {
+    const [{ seedReferenceData }, { syncContentLessons }, { onboardingService }, planSvc] = await Promise.all([
+      import("../seed/index.ts"),
+      import("../catalog/sync-content.ts"),
+      import("../onboarding/service.ts"),
+      import("../certificates/plan-service.ts"),
+    ]);
+    await seedReferenceData();
+    await syncContentLessons(db);
+    const user = await register("Plan Holder");
+    const service = onboardingService(db);
+    const { sessionId } = await service.createSession("sales_manager");
+    const { plan } = await service.complete(sessionId);
+    await service.claim(sessionId, user.id);
+    const slugs = plan.items.map((i: { lessonSlug: string | null }) => i.lessonSlug);
+    assert.ok(plan.items.length > 1 && slugs.every(Boolean), "every plan item has a real lesson");
+
+    for (const slug of slugs.slice(0, -1)) await planSvc.markPlanItemsDone(db, user.id, slug as string);
+    assert.equal(await planSvc.issuePlanCertificateIfComplete(db, user.id), null, "not while an item is open");
+
+    await planSvc.markPlanItemsDone(db, user.id, slugs.at(-1) as string);
+    const first = await planSvc.issuePlanCertificateIfComplete(db, user.id);
+    assert.ok(first);
+    assert.equal((await planSvc.issuePlanCertificateIfComplete(db, user.id))?.id, first.id, "repeat issue returns the same one");
+
+    const pub = await app.inject({ method: "GET", url: `/plan-certificates/${first.id}` });
+    assert.equal(pub.statusCode, 200, pub.body);
+    assert.equal(pub.json().holderName, "Plan Holder");
+    assert.equal(pub.json().title, planSvc.PLAN_CERTIFICATE_TITLE);
+    assert.equal(pub.json().skills.length, plan.items.length);
+
+    // Frozen: renaming a skill later does not change the issued certificate; the holder name stays live.
+    await db.update(schema.skills).set({ title: "Renamed later" });
+    await db.update(schema.users).set({ name: "Renamed Holder" }).where(eq(schema.users.id, user.id));
+    const after = (await app.inject({ method: "GET", url: `/plan-certificates/${first.id}` })).json();
+    assert.ok(!after.skills.includes("Renamed later"), "skill list is frozen at issue time");
+    assert.equal(after.holderName, "Renamed Holder", "name is live");
+
+    const list = await app.inject({ method: "GET", url: "/plan-certificates", headers: { authorization: `Bearer ${user.token}` } });
+    assert.equal(list.json().length, 1);
+    assert.equal((await app.inject({ method: "GET", url: "/plan-certificates" })).statusCode, 401);
+    assert.equal((await app.inject({ method: "GET", url: `/plan-certificates/${crypto.randomUUID()}` })).statusCode, 404);
+  });
 });

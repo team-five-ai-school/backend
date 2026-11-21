@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { getCertificate, listCertificates } from "../certificates/service.ts";
+import { getPlanCertificate, listPlanCertificates, type PlanCertificateView } from "../certificates/plan-service.ts";
 import { db } from "../db/index.ts";
 import { error, ErrorBody, secured } from "../lib/http.ts";
 import { requireAuth } from "../plugins/auth.ts";
@@ -15,6 +16,15 @@ const CertificateDto = z.object({
   issuedAt: z.string(),
 });
 const toDto = (c: NonNullable<Awaited<ReturnType<typeof getCertificate>>>) => ({ ...c, issuedAt: c.issuedAt.toISOString() });
+
+const PlanCertificateDto = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  holderName: z.string(),
+  skills: z.array(z.string()),
+  issuedAt: z.string(),
+});
+const toPlanDto = (c: PlanCertificateView) => ({ ...c, issuedAt: c.issuedAt.toISOString() });
 
 export const certificatesRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
@@ -40,6 +50,33 @@ export const certificatesRoutes: FastifyPluginAsyncZod = async (app) => {
       const cert = await getCertificate(db, req.params.id);
       if (!cert) return reply.code(404).send(error("Certificate not found"));
       return toDto(cert);
+    },
+  );
+
+  // Final certificate for a completed learning plan.
+  app.get(
+    "/plan-certificates",
+    {
+      onRequest: requireAuth,
+      schema: { tags: ["certificates"], security: secured, response: { 200: z.array(PlanCertificateDto) } },
+    },
+    async (req) => (await listPlanCertificates(db, req.user.sub)).map(toPlanDto),
+  );
+
+  // Public Verification link: no login. The unguessable id is the access control.
+  app.get(
+    "/plan-certificates/:id",
+    {
+      schema: {
+        tags: ["certificates"],
+        params: z.object({ id: z.uuid() }),
+        response: { 200: PlanCertificateDto, 404: ErrorBody },
+      },
+    },
+    async (req, reply) => {
+      const cert = await getPlanCertificate(db, req.params.id);
+      if (!cert) return reply.code(404).send(error("Certificate not found"));
+      return toPlanDto(cert);
     },
   );
 };
