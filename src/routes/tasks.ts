@@ -3,7 +3,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { db } from "../db/index.ts";
-import { tasks } from "../db/schema.ts";
+import { tasks } from "../db/schema/index.ts";
 
 // Example resource: copy this file for new resources, register it in src/app.ts, then delete it.
 

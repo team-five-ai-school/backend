@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { sql } from "drizzle-orm";
-import Fastify from "fastify";
+import Fastify, { type FastifyError } from "fastify";
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -13,6 +13,8 @@ import { z } from "zod";
 
 import { db } from "./db/index.ts";
 import { env } from "./env.ts";
+import { registerAuth } from "./plugins/auth.ts";
+import { authRoutes } from "./routes/auth.ts";
 import { tasksRoutes } from "./routes/tasks.ts";
 
 const PUBLIC_PATHS = ["/health", "/docs"];
@@ -24,6 +26,17 @@ export async function buildApp() {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  // One error shape for every route: `{ error, code? }`. 5xx details go to the log, not the client.
+  app.setErrorHandler((err: FastifyError, req, reply) => {
+    const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    if (status >= 500) {
+      req.log.error(err);
+      return reply.code(status).send({ error: "Internal server error" });
+    }
+    return reply.code(status).send({ error: err.message, code: err.code });
+  });
+  app.setNotFoundHandler((req, reply) => reply.code(404).send({ error: `Route ${req.method} ${req.url} not found` }));
+
   await app.register(cors, {
     origin: env.CORS_ORIGINS === "*" ? "*" : env.CORS_ORIGINS.split(",").map((o) => o.trim()),
   });
@@ -32,7 +45,13 @@ export async function buildApp() {
   await app.register(swagger, {
     openapi: {
       info: { title: "Team Five API", version: "0.1.0" },
-      components: { securitySchemes: { apiKey: { type: "apiKey", in: "header", name: "x-api-key" } } },
+      components: {
+        securitySchemes: {
+          apiKey: { type: "apiKey", in: "header", name: "x-api-key" },
+          // Paste the `token` from POST /auth/login. Routes marked with `security: secured` send it.
+          bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+        },
+      },
       security: [{ apiKey: [] }],
     },
     transform: jsonSchemaTransform,
@@ -54,6 +73,13 @@ export async function buildApp() {
     },
   );
 
+  // JWT auth: app.jwt.sign(), req.jwtVerify(); protect routes with `onRequest: requireAuth`.
+  await registerAuth(app);
+
+  // Feature routes. Each plugin declares its full paths (grep a path to find its owner).
+  await app.register(authRoutes);
+
+  // Example resource, kept for the frontend /examples/tasks page. Remove both together.
   await app.register(tasksRoutes, { prefix: "/tasks" });
 
   return app;

@@ -1,6 +1,6 @@
 import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-/** Example table. Matches the `Task` type in the frontend (src/features/tasks). */
+/** Example table. Matches the `Task` type in the frontend (src/features/tasks). Remove together with the example. */
 export const tasks = pgTable("tasks", {
   id: uuid().primaryKey().defaultRandom(),
   title: text().notNull(),
